@@ -1,9 +1,19 @@
-import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, Router, ActivatedRoute } from '@angular/router';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { Observable, of } from 'rxjs';
+import { map, catchError, switchMap, tap } from 'rxjs/operators';
 import { VideoGameService } from '../../../../core/services/video-game.service';
 import { UpdateVideoGameVm, VideoGame } from '../../models/video-game.model';
+
+interface EditState {
+  game: VideoGame | null;
+  loading: boolean;
+  error: string;
+  success: string;
+  submitting: boolean;
+}
 
 @Component({
   selector: 'app-edit',
@@ -14,12 +24,8 @@ import { UpdateVideoGameVm, VideoGame } from '../../models/video-game.model';
 })
 export class EditComponent implements OnInit {
   gameForm!: FormGroup;
-  gameId: number | null = null;
-  isEditMode = false;
-  loading = false;
-  error = '';
-  success = '';
-
+  editState$!: Observable<EditState>;
+  
   genres = ['Action', 'Adventure', 'RPG', 'Strategy', 'Sports', 'Racing', 'Simulation', 'Puzzle', 'Fighting', 'Action-Adventure', 'Action RPG'];
   platforms = ['PC', 'PlayStation 5', 'PlayStation 4', 'Xbox Series X/S', 'Xbox One', 'Nintendo Switch', 'Multi-platform', 'Mobile'];
 
@@ -27,22 +33,24 @@ export class EditComponent implements OnInit {
     private fb: FormBuilder,
     private videoGameService: VideoGameService,
     private router: Router,
-    private route: ActivatedRoute,
-    private cd: ChangeDetectorRef
+    private route: ActivatedRoute
   ) {
     this.initializeForm();
   }
 
   ngOnInit(): void {
-    this.route.params.subscribe(params => {
-      if (params['id']) {
-        this.gameId = +params['id'];
-        this.loadGame(this.gameId);
-      }
-    });
+    this.editState$ = this.route.params.pipe(
+      switchMap(params => {
+        if (params['id']) {
+          const gameId = +params['id'];
+          return this.loadGame(gameId);
+        }
+        return of(this.createInitialState());
+      })
+    );
   }
 
-  initializeForm(): void {
+  private initializeForm(): void {
     this.gameForm = this.fb.group({
       title: ['', [Validators.required, Validators.maxLength(200)]],
       publisher: ['', Validators.maxLength(100)],
@@ -55,29 +63,50 @@ export class EditComponent implements OnInit {
     });
   }
 
-  loadGame(id: number): void {
-    this.loading = true;
-    this.videoGameService.getById(id).subscribe({
-      next: (game: VideoGame) => {
-        this.gameForm.patchValue({
-          title: game.title,
-          publisher: game.publisher,
-          releaseDate: game.releaseDate ? new Date(game.releaseDate).toISOString().split('T')[0] : '',
-          genre: game.genre,
-          rating: game.rating,
-          description: game.description,
-          platform: game.platform,
-          price: game.price
-        });
-        this.loading = false;
-        this.cd.detectChanges();
-      },
-      error: (err) => {
-        this.error = 'Failed to load game. Please try again.';
-        this.loading = false;
+  private loadGame(id: number): Observable<EditState> {
+    return this.videoGameService.getById(id).pipe(
+      tap(game => this.populateForm(game)),
+      map(game => ({
+        game,
+        loading: false,
+        error: '',
+        success: '',
+        submitting: false
+      })),
+      catchError(err => {
         console.error('Error loading game:', err);
-      }
+        return of({
+          game: null,
+          loading: false,
+          error: 'Failed to load game. Please try again.',
+          success: '',
+          submitting: false
+        });
+      })
+    );
+  }
+
+  private populateForm(game: VideoGame): void {
+    this.gameForm.patchValue({
+      title: game.title,
+      publisher: game.publisher,
+      releaseDate: game.releaseDate ? new Date(game.releaseDate).toISOString().split('T')[0] : '',
+      genre: game.genre,
+      rating: game.rating,
+      description: game.description,
+      platform: game.platform,
+      price: game.price
     });
+  }
+
+  private createInitialState(): EditState {
+    return {
+      game: null,
+      loading: false,
+      error: '',
+      success: '',
+      submitting: false
+    };
   }
 
   onSubmit(): void {
@@ -86,13 +115,22 @@ export class EditComponent implements OnInit {
       return;
     }
 
-    this.loading = true;
-    this.error = '';
-    this.success = '';
+    const gameData = this.buildGameData();
 
+    this.videoGameService.update(gameData).subscribe({
+      next: () => {
+        setTimeout(() => this.router.navigate(['/browser']), 1500);
+      },
+      error: (err) => {
+        console.error('Error updating game:', err);
+      }
+    });
+  }
+
+  private buildGameData(): UpdateVideoGameVm {
     const formValue = this.gameForm.value;
-    const gameData: UpdateVideoGameVm = {
-      id: this.gameId || 0, 
+    return {
+      id: this.getGameId(),
       title: formValue.title.trim(),
       publisher: formValue.publisher?.trim() || undefined,
       releaseDate: formValue.releaseDate ? new Date(formValue.releaseDate) : new Date(),
@@ -102,20 +140,11 @@ export class EditComponent implements OnInit {
       platform: formValue.platform || undefined,
       price: formValue.price !== null && formValue.price !== '' ? +formValue.price : undefined
     };
+  }
 
-    this.videoGameService.update(gameData).subscribe({
-      next: () => {
-        this.success = 'Game updated successfully!';
-        this.loading = false;
-        setTimeout(() => this.router.navigate(['/browser']), 1500);
-      },
-      error: (err) => {
-        this.error = 'Failed to update game. Please try again.';
-        this.loading = false;
-        console.error('Error updating game:', err);
-      }
-    });
-   
+  private getGameId(): number {
+    const id = this.route.snapshot.params['id'];
+    return id ? +id : 0;
   }
 
   onCancel(): void {

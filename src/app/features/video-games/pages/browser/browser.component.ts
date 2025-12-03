@@ -1,9 +1,19 @@
-import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef, NgZone } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { VideoGameService } from '../../../../core/services/video-game.service';
-import { VideoGame } from '../../models/video-game.model';
+import { PaginatedResult, VideoGame } from '../../models/video-game.model';
+import { BehaviorSubject, catchError, combineLatest, finalize, map, Observable, of, startWith, switchMap, tap } from 'rxjs';
+
+interface GameState {
+  games: VideoGame[];
+  currentPage: number;
+  totalPages: number;
+  totalCount: number;
+  loading: boolean;
+  error: string;
+}
 
 @Component({
   selector: 'app-browser',
@@ -13,16 +23,15 @@ import { VideoGame } from '../../models/video-game.model';
   styleUrls: ['./browser.component.scss']
 })
 export class BrowserComponent implements OnInit {
-  games: VideoGame[] = [];
-  currentPage = 1;
-  pageSize = 10;
-  totalPages = 0;
-  totalCount = 0;
+  private refreshTrigger$ = new BehaviorSubject<void>(undefined);
+  
+  gameState$!: Observable<GameState>;
+  
   searchTerm = '';
   sortBy = 'title';
   sortDescending = false;
-  loading = false;
-  error = '';
+  pageSize = 10;
+  currentPage = 1;
 
   pageSizes = [5, 10, 20, 50];
   sortOptions = [
@@ -33,72 +42,96 @@ export class BrowserComponent implements OnInit {
     { value: 'price', label: 'Price' }
   ];
 
-   constructor(private videoGameService: VideoGameService, 
-    private change: ChangeDetectorRef) {}
+  constructor(private videoGameService: VideoGameService) {}
 
   ngOnInit(): void {
-    this.loadGames();
+    this.gameState$ = this.refreshTrigger$.pipe(
+      switchMap(() => this.loadGames()),
+      startWith(this.createLoadingState())
+    );
   }
 
-  loadGames(): void {
-    this.loading = true;
-    this.error = '';
-
-    this.videoGameService.getVideoGames(
+  private loadGames(): Observable<GameState> {
+    return this.videoGameService.getVideoGames(
       this.currentPage,
       this.pageSize,
       this.searchTerm || undefined,
       this.sortBy,
       this.sortDescending
-    ).subscribe({
-      next: (result) => {
-        this.games = result.items;
-        this.currentPage = result.pageIndex;
-        this.totalPages = result.totalPages;
-        this.totalCount = result.totalCount;
-        this.loading = false;
-        this.change.detectChanges()
-      },
-      error: (err) => {
-        this.error = 'Failed to load games. Please try again.';
-        this.loading = false;
-        console.error('Error loading games:', err);
-      }
+    ).pipe(
+      map(result => this.mapToSuccessState(result)),
+      catchError(err => this.handleError(err))
+    );
+  }
+
+  private mapToSuccessState(result: PaginatedResult<VideoGame>): GameState {
+    return {
+      games: result.items,
+      currentPage: result.pageIndex,
+      totalPages: result.totalPages,
+      totalCount: result.totalCount,
+      loading: false,
+      error: ''
+    };
+  }
+
+  private handleError(err: any): Observable<GameState> {
+    console.error('Error loading games:', err);
+    return of({
+      games: [],
+      currentPage: this.currentPage,
+      totalPages: 0,
+      totalCount: 0,
+      loading: false,
+      error: 'Failed to load games. Please try again.'
     });
+  }
+
+  private createLoadingState(): GameState {
+    return {
+      games: [],
+      currentPage: this.currentPage,
+      totalPages: 0,
+      totalCount: 0,
+      loading: true,
+      error: ''
+    };
+  }
+
+  private refresh(): void {
+    this.refreshTrigger$.next();
   }
 
   onSearch(): void {
     this.currentPage = 1;
-    this.loadGames();
+    this.refresh();
   }
 
   onSortChange(): void {
     this.currentPage = 1;
-    this.loadGames();
+    this.refresh();
   }
 
   toggleSortDirection(): void {
     this.sortDescending = !this.sortDescending;
-    this.loadGames();
+    this.refresh();
   }
 
   onPageSizeChange(): void {
     this.currentPage = 1;
-    this.loadGames();
+    this.refresh();
   }
 
   goToPage(page: number): void {
-    if (page >= 1 && page <= this.totalPages) {
-      this.currentPage = page;
-      this.loadGames();
-    }
+    this.currentPage = page;
+    this.refresh();
   }
 
-  getPageNumbers(): number[] {
+  getPageNumbers(totalPages: number, currentPage: number): number[] {
     const pages: number[] = [];
     const maxPagesToShow = 5;
-    let startPage = Math.max(1, this.currentPage - Math.floor(maxPagesToShow / 2));
-    let endPage = Math.min(this.totalPages, startPage + maxPagesToShow - 1);
+    let startPage = Math.max(1, currentPage - Math.floor(maxPagesToShow / 2));
+    let endPage = Math.min(totalPages, startPage + maxPagesToShow - 1);
 
     if (endPage - startPage < maxPagesToShow - 1) {
       startPage = Math.max(1, endPage - maxPagesToShow + 1);
@@ -110,8 +143,6 @@ export class BrowserComponent implements OnInit {
 
     return pages;
   }
-
-  
 
   formatDate(date: Date | undefined): string {
     if (!date) return 'N/A';

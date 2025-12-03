@@ -9,131 +9,131 @@
           </h3>
         </div>
         <div class="card-body">
-          
-          <div *ngIf="success" class="alert alert-success alert-dismissible fade show" role="alert">
-            <i class="bi bi-check-circle me-2"></i>{{ success }}
-            <button type="button" class="btn-close" (click)="success = ''" aria-label="Close"></button>
-          </div>
-
-          <div *ngIf="error" class="alert alert-danger alert-dismissible fade show" role="alert">
-            <i class="bi bi-exclamation-triangle me-2"></i>{{ error }}
-            <button type="button" class="btn-close" (click)="error = ''" aria-label="Close"></button>
-          </div>
-
-          <div *ngIf="loading && isEditMode && !gameForm.value.title" class="text-center my-5">
-            <div class="spinner-border text-primary" role="status">
-              <span class="visually-hidden">Loading...</span>
+          <ng-container *ngIf="editState$ | async as state">
+            
+            <div *ngIf="state.success" class="alert alert-success alert-dismissible fade show" role="alert">
+              <i class="bi bi-check-circle me-2"></i>{{ state.success }}
             </div>
-          </div>
 
-          <form *ngIf="!loading || gameForm.value.title" [formGroup]="gameForm" (ngSubmit)="onSubmit()">
-            <div class="row">
-              <div class="col-md-12 mb-3">
-                <label for="title" class="form-label">
-                  Title <span class="text-danger">*</span>
-                </label>
-                <input 
-                  type="text" 
-                  class="form-control" 
-                  id="title" 
-                  formControlName="title"
-                  [class.is-invalid]="isFieldInvalid('title')"
-                  placeholder="Enter game title">
-                <div *ngIf="isFieldInvalid('title')" class="invalid-feedback">
-                  {{ getFieldError('title') }}
-                </div>
-              </div>
-              <div class="col-md-6 mb-3">
-                <label for="publisher" class="form-label">Publisher</label>
-                <input 
-                  type="text" 
-                  class="form-control" 
-                  id="publisher" 
-                  formControlName="publisher"
-                  [class.is-invalid]="isFieldInvalid('publisher')"
-                  placeholder="Enter publisher">
-                <div *ngIf="isFieldInvalid('publisher')" class="invalid-feedback">
-                  {{ getFieldError('publisher') }}
-                </div>
-              </div>
-              <div class="col-md-6 mb-3">
-                <label for="genre" class="form-label">Genre</label>
-                <select class="form-select" id="genre" formControlName="genre">
-                  <option value="">Select a genre</option>
-                  <option *ngFor="let genre of genres" [value]="genre">{{ genre }}</option>
-                </select>
-              </div>
-              <div class="col-md-6 mb-3">
-                <label for="platform" class="form-label">Platform</label>
-                <select class="form-select" id="platform" formControlName="platform">
-                  <option value="">Select a platform</option>
-                  <option *ngFor="let platform of platforms" [value]="platform">{{ platform }}</option>
-                </select>
-              </div>
-              <div class="col-md-4 mb-3">
-                <label for="releaseDate" class="form-label">Release Date</label>
-                <input 
-                  type="date" 
-                  class="form-control" 
-                  id="releaseDate" 
-                  formControlName="releaseDate">
-              </div>
-              <div class="col-md-4 mb-3">
-                <label for="rating" class="form-label">Rating (0-10)</label>
-                <input 
-                  type="number" 
-                  class="form-control" 
-                  id="rating" 
-                  formControlName="rating"
-                  [class.is-invalid]="isFieldInvalid('rating')"
-                  step="0.1"
-                  min="0"
-                  max="10"
-                  placeholder="0.0">
-                <div *ngIf="isFieldInvalid('rating')" class="invalid-feedback">
-                  {{ getFieldError('rating') }}
-                </div>
-              </div>
-              <div class="col-md-4 mb-3">
-                <label for="price" class="form-label">Price ($)</label>
-                <input 
-                  type="number" 
-                  class="form-control" 
-                  id="price" 
-                  formControlName="price"
-                  [class.is-invalid]="isFieldInvalid('price')"
-                  step="0.01"
-                  min="0"
-                  placeholder="0.00">
-                <div *ngIf="isFieldInvalid('price')" class="invalid-feedback">
-                  {{ getFieldError('price') }}
-                </div>
-              </div>
-              <div class="col-md-12 mb-3">
-                <label for="description" class="form-label">Description</label>
-                <textarea 
-                  class="form-control" 
-                  id="description" 
-                  formControlName="description"
-                  [class.is-invalid]="isFieldInvalid('description')"
-                  rows="4"
-                  placeholder="Enter game description"></textarea>
-                <div *ngIf="isFieldInvalid('description')" class="invalid-feedback">
-                  {{ getFieldError('description') }}
-                </div>
+            <div *ngIf="state.error" class="alert alert-danger alert-dismissible fade show" role="alert">
+              <i class="bi bi-exclamation-triangle me-2"></i>{{ state.error }}
+            </div>
+
+            <div *ngIf="state.loading" class="text-center my-5">
+              <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
               </div>
             </div>
-            <div class="d-flex justify-content-between mt-4">
-              <button type="button" class="btn btn-secondary" (click)="onCancel()" [disabled]="loading">
-                <i class="bi bi-x-circle me-2"></i>Cancel
-              </button>
-              <button type="submit" class="btn btn-primary" [disabled]="loading || gameForm.invalid">
-                <span *ngIf="loading" class="spinner-border spinner-border-sm me-2" role="status"></span>
-                <i *ngIf="!loading" class="bi bi-save me-2"></i>
-                Update Game
-              </button>
-            </div>
-          </form>
+
+            <form *ngIf="!state.loading" [formGroup]="gameForm" (ngSubmit)="onSubmit()">
+              <div class="row">
+                <div class="col-md-12 mb-3">
+                  <label for="title" class="form-label">
+                    Title <span class="text-danger">*</span>
+                  </label>
+                  <input 
+                    type="text" 
+                    class="form-control" 
+                    id="title" 
+                    formControlName="title"
+                    [class.is-invalid]="isFieldInvalid('title')"
+                    placeholder="Enter game title">
+                  <div *ngIf="isFieldInvalid('title')" class="invalid-feedback">
+                    {{ getFieldError('title') }}
+                  </div>
+                </div>
+                <div class="col-md-6 mb-3">
+                  <label for="publisher" class="form-label">Publisher</label>
+                  <input 
+                    type="text" 
+                    class="form-control" 
+                    id="publisher" 
+                    formControlName="publisher"
+                    [class.is-invalid]="isFieldInvalid('publisher')"
+                    placeholder="Enter publisher">
+                  <div *ngIf="isFieldInvalid('publisher')" class="invalid-feedback">
+                    {{ getFieldError('publisher') }}
+                  </div>
+                </div>
+                <div class="col-md-6 mb-3">
+                  <label for="genre" class="form-label">Genre</label>
+                  <select class="form-select" id="genre" formControlName="genre">
+                    <option value="">Select a genre</option>
+                    <option *ngFor="let genre of genres" [value]="genre">{{ genre }}</option>
+                  </select>
+                </div>
+                <div class="col-md-6 mb-3">
+                  <label for="platform" class="form-label">Platform</label>
+                  <select class="form-select" id="platform" formControlName="platform">
+                    <option value="">Select a platform</option>
+                    <option *ngFor="let platform of platforms" [value]="platform">{{ platform }}</option>
+                  </select>
+                </div>
+                <div class="col-md-4 mb-3">
+                  <label for="releaseDate" class="form-label">Release Date</label>
+                  <input 
+                    type="date" 
+                    class="form-control" 
+                    id="releaseDate" 
+                    formControlName="releaseDate">
+                </div>
+                <div class="col-md-4 mb-3">
+                  <label for="rating" class="form-label">Rating (0-10)</label>
+                  <input 
+                    type="number" 
+                    class="form-control" 
+                    id="rating" 
+                    formControlName="rating"
+                    [class.is-invalid]="isFieldInvalid('rating')"
+                    step="0.1"
+                    min="0"
+                    max="10"
+                    placeholder="0.0">
+                  <div *ngIf="isFieldInvalid('rating')" class="invalid-feedback">
+                    {{ getFieldError('rating') }}
+                  </div>
+                </div>
+                <div class="col-md-4 mb-3">
+                  <label for="price" class="form-label">Price ($)</label>
+                  <input 
+                    type="number" 
+                    class="form-control" 
+                    id="price" 
+                    formControlName="price"
+                    [class.is-invalid]="isFieldInvalid('price')"
+                    step="0.01"
+                    min="0"
+                    placeholder="0.00">
+                  <div *ngIf="isFieldInvalid('price')" class="invalid-feedback">
+                    {{ getFieldError('price') }}
+                  </div>
+                </div>
+                <div class="col-md-12 mb-3">
+                  <label for="description" class="form-label">Description</label>
+                  <textarea 
+                    class="form-control" 
+                    id="description" 
+                    formControlName="description"
+                    [class.is-invalid]="isFieldInvalid('description')"
+                    rows="4"
+                    placeholder="Enter game description"></textarea>
+                  <div *ngIf="isFieldInvalid('description')" class="invalid-feedback">
+                    {{ getFieldError('description') }}
+                  </div>
+                </div>
+              </div>
+              <div class="d-flex justify-content-between mt-4">
+                <button type="button" class="btn btn-secondary" (click)="onCancel()" [disabled]="state.submitting">
+                  <i class="bi bi-x-circle me-2"></i>Cancel
+                </button>
+                <button type="submit" class="btn btn-primary" [disabled]="state.submitting || gameForm.invalid">
+                  <span *ngIf="state.submitting" class="spinner-border spinner-border-sm me-2" role="status"></span>
+                  <i *ngIf="!state.submitting" class="bi bi-save me-2"></i>
+                  Update Game
+                </button>
+              </div>
+            </form>
+          </ng-container>
         </div>
       </div>
     </div>
